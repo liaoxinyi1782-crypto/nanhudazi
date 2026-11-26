@@ -66,7 +66,19 @@ function showLoggedIn() {
 
 function apiHeaders() { return {'apikey':supabaseAnonKey,'Content-Type':'application/json'}; }
 async function api(path, options = {}) {
-  const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, {method:options.method || 'GET',headers:{...apiHeaders(),...(options.headers || {}),...(options.prefer ? {'Prefer':options.prefer} : {})},body:options.body ? JSON.stringify(options.body) : undefined});
+  const request = {method:options.method || 'GET',headers:{...apiHeaders(),...(options.headers || {}),...(options.prefer ? {'Prefer':options.prefer} : {})},body:options.body ? JSON.stringify(options.body) : undefined};
+  let response;
+  try {
+    response = await fetch(`${supabaseUrl}/rest/v1/${path}`, request);
+  } catch (firstError) {
+    if (navigator.onLine === false) throw new Error('当前设备未连接网络，请检查网络后重试。');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      response = await fetch(`${supabaseUrl}/rest/v1/${path}`, request);
+    } catch {
+      throw new Error('无法连接共享数据库。请检查网络，或尝试用 Safari/Chrome 打开；部分网络可能无法稳定访问数据库服务。');
+    }
+  }
   const data = await response.json().catch(() => null);
   if (!response.ok) throw new Error(data?.message || data?.hint || data?.details || `数据库请求失败（${response.status}）`);
   return data;
@@ -82,7 +94,7 @@ async function loadCloudPosts() {
 }
 async function enterShared(username) {
   const error = document.getElementById('cloudError');
-  if (!/^\d{12}$/.test(username)) { error.textContent='请输入完整的 12 位数字用户名'; return; }
+  if (!/^20\d{10}$/.test(username)) { error.textContent='请输入 20 开头的 12 位学号'; return; }
   error.textContent='';
   currentUser={username};
   const button=document.getElementById('cloudEnter'); button.disabled=true; button.textContent='正在连接共享广场…';
@@ -102,7 +114,7 @@ document.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('clic
 document.getElementById('search').addEventListener('input', render);
 document.getElementById('enterBtn').onclick = () => {
   const val = document.getElementById('studentId').value.trim();
-  if (!/^\d{12}$/.test(val)) { document.getElementById('gateError').textContent='请输入完整的 12 位数字用户名'; return; }
+  if (!/^20\d{10}$/.test(val)) { document.getElementById('gateError').textContent='请输入 20 开头的 12 位学号'; return; }
   student = val; showLoggedIn();
 };
 document.getElementById('studentId').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('enterBtn').click(); });
